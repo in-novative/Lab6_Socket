@@ -26,11 +26,6 @@ struct sockaddr{
 };*/
 //////////////////////////////////////////////////////////////////////////
 //!server相关结构体
-struct packet { 
-     int command;
-     int length;
-     std::string payload;
-}; // 自定义的数据包格式
 struct server_info{
      short _family;
      unsigned short _port;
@@ -46,13 +41,3 @@ struct client_info{
      pthread_t _thread_id;
 };
 #endif
-
-/*
-| 命令号 | 命令 |
-|  '1'  |  获取时间  |
-|  '2'  |  获取服务器名字  |
-|  '3'  |  获取客户端列表  |
-|  '4'  |  发送消息  |
-|  '5'  |  断开连接  |
-|  '6'  |  发生错误  |
-*/

@@ -2,6 +2,7 @@
 #include<iostream>
 #include<pthread.h>
 #include"server_header.h"
+#include"../packet.h"
 
 void *receive(void*);
 bool connect(int socket, uint16_t port);
