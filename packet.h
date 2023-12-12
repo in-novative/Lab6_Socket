@@ -35,6 +35,23 @@ std::string serialize(struct packet message)
 }
 struct packet deserializa(std::string string_in)
 {
-
+    int i{0};
+    struct packet message;
+    std::stringstream ss;
+    ss << std::hex << string_in.substr(i, i+=sizeof(uint32_t));
+    ss >> message.confirm_num;
+    ss.str() = "";
+    ss << std::hex << string_in.substr(i, i+=sizeof(short));
+    ss >> message.command;
+    ss.str() = "";
+    ss << std::hex << string_in.substr(i, i+=sizeof(int));
+    ss >> message.dest;
+    ss.str() = "";
+    ss << std::hex << string_in.substr(i, i+=sizeof(int));
+    ss >> message.length;
+    ss.str() = "";
+    ss << string_in.substr(i, message.length);
+    message.payload = ss.str();
+    return message;
 }
 #endif
