@@ -1,4 +1,11 @@
 //使用 <pthread.h> 中的互斥锁需要在编译时链接 pthread 库，方法是在编译命令中添加 -pthread 参数。
+/*
+a)向客户端传送服务端所在机器的当前时间
+b)向客户端传送服务端所在机器的名称
+c)向客户端传送当前连接的所有客户端信息
+d)将某客户端发送过来的内容转发给指定编号的其他客户端
+e)采用异步多线程编程模式，正确处理多个客户端同时连接，同时发送消息的情况
+*/
 #include<iostream>
 #include<pthread.h>
 #include"server_header.h"
@@ -6,9 +13,14 @@
 
 void *receive(void* id);                                                                                //子进程入口函数
 bool connect(int socket, uint16_t port);                                                                //主机连接到目标端口
-struct server_info server;                                                                              //记录主机信息
-std::map<int, struct client_info>client;                                                                //键值对是客户端id和信息
+std::string _GetTime();                                                                                 //返回当前时间
+std::string _GetServerName();                                                                           //返回主机名
+std::string _GetClientList();                                                                           //返回客户端列表
+
+struct server_info server;                                                                              //记录主机信息，详见server_header.h
+std::map<int, struct client_info>client;                                                                //键值对是客户端id和相关信息，详见server_header.h
 pthread_mutex_t mutex;                                                                                  //互斥锁
+int id{0};                                                                                              //客户端id
 
 int main()
 {
@@ -21,28 +33,29 @@ int main()
         return 1;
     }
     while(!_is_connected){
-        std::cout << "\n请输入连接主机名" << std::endl;
+        std::cout << "请输入连接主机名\n";
         std::cin >> server._name;
-        std::cout << "\n请输入连接端口" << std::endl;
+        std::cout << "\n请输入连接端口\n";
         std::cin >> server._port;
+        std::cout << std::endl;
         _is_connected = connect(server._socket,server._port);                                           //连接到目标端口，设置主机名
     }
                                                                                                         //!主线程循环调用accept()，直到返回一个有效的socket句柄
-    int id = 0;
     server._socket_length = sizeof(server._socket);
     while(1){
         sockaddr client_addr;
-        int new_socket = accept(server._socket, &client_addr, &server._socket_length);                  //server的写操作均发生在创建新线程前，无需加锁
+        int new_socket = accept(server._socket, &client_addr, &server._socket_length);                  //?server的写操作均发生在创建新线程前，无需加锁
         if(new_socket < 0){                                                                             //申请新句柄失败
-            std::cerr << "[Error]: Server Accept Failed" << std::endl;
+            //std::cerr << "[Error]: Server Accept Failed" << std::endl;
             continue;
         }
-        else {
+        else {                                                                                          //申请新句柄成功,有新的客户端连接
                                                                                                         //!增加一个新客户端的项目，并记录下该客户端句柄和连接状态、端口
             while(pthread_mutex_trylock(&mutex)){}                                                      //加锁
             pthread_t thread;
             if(pthread_create(&thread, NULL, receive, (void*)&new_socket)){                             //子进程创建失败
-                std::cerr << "[Error]: pthread_create() Failed" << std::endl;
+                std::cerr << "[Error]: Thread Creation Failed" << std::endl;
+                pthread_mutex_unlock(&mutex);                                                           //释放锁
                 continue;
             }
             struct client_info new_client = {client_addr, new_socket, sizeof(new_socket), thread};      //记录新添加客户端的信息
@@ -93,23 +106,48 @@ void *receive(void* id)
         strncpy((char*)&receive_packet, ss_ptr, PACKET_LENGTH);                                             //反序列化接收到的数据包
         free(ss_ptr);
         if(receive_packet.confirm_num != CONFIRM_NUM){                                                      //反序列化确认号错误
-            std::cerr << "[Error]: Deserialize Error" << std::endl;
+            std::cerr << "[Error]: Deserialize Failed" << std::endl;
+            continue;
+        }
+        if(receive_packet.src != client_id){                                                                //客户端id错误
+            std::cerr << "[Error]: Client Id Error" << std::endl;
+            continue;
         }
                                                                                                             //!收到一个完整的包
         switch(receive_packet.command){
             case GetTime:{                                                                                  //获取时间
+                if(receive_packet.dst==ServerId && client.find(receive_packet.src)!=client.end()){
+                    struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, receive_packet.src, *_GetTime().c_str()};
+                    send(client[receive_packet.src]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
+                }
                 break;
             }
             case GetServerName:{                                                                            //获取主机名
+                if(receive_packet.dst==ServerId && client.find(receive_packet.src)!=client.end()){
+                    struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, receive_packet.src, *_GetClientList().c_str()};
+                    send(client[receive_packet.src]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
+                }
                 break;
             }
             case GetClientList:{                                                                            //获取客户端列表
+                if(receive_packet.dst==ServerId && client.find(receive_packet.src)!=client.end()){
+                    struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, receive_packet.src, *_GetServerName().c_str()};
+                    send(client[receive_packet.src]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
+                }
                 break;
             }
-            case SendMessage:{                                                                              //发送消息
+            case SendMessage:{                                                                              //发送消息(暂时只处理转发)
+                if(client.find(receive_packet.src)!=client.end() && client.find(receive_packet.dst)!=client.end()){
+                    struct packet message = {CONFIRM_NUM, receive_packet.command, receive_packet.src, receive_packet.dst, *receive_packet.payload};
+                    send(client[receive_packet.dst]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
+                }
                 break;
             }
             case Disconnect:{                                                                               //断开连接
+                if(receive_packet.dst==ServerId && client.find(receive_packet.src)!=client.end()){
+                    client.erase(receive_packet.src);                                                       //删除client中的键值对
+                    _Exit(0);                                                                               //退出子进程
+                }
                 break;
             }
             case Err:{                                                                                      //发生错误
@@ -122,10 +160,32 @@ void *receive(void* id)
     }
 }
 
-/*
-a)向客户端传送服务端所在机器的当前时间
-b)向客户端传送服务端所在机器的名称
-c)向客户端传送当前连接的所有客户端信息
-d)将某客户端发送过来的内容转发给指定编号的其他客户端
-e)采用异步多线程编程模式，正确处理多个客户端同时连接，同时发送消息的情况
-*/
+std::string _GetTime()
+{
+    std::ostringstream ss;
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    ss << std::put_time(std::localtime(&now_c), "%Y.%m.%d.%H.%M");
+    std::string current_time = ss.str();
+    return current_time;
+}
+
+std::string _GetClientList()                            //格式为 序号: 1    地址: 127.0.0.1:8080
+{
+    while(pthread_mutex_trylock(&mutex)){}              //加锁
+    std::string ClientList;
+    for(int i=0; i<id; i++){
+        std::string clientInfo = "序号: " + std::to_string(i) + "\t" + "地址: " + client[i]._addr.sa_data + "\n";
+        ClientList += clientInfo;
+    }
+    pthread_mutex_unlock(&mutex);                       //释放锁
+    return ClientList;
+}
+
+std::string _GetServerName()
+{
+    while(pthread_mutex_trylock(&mutex)){}              //加锁
+    std::string ServerName(server._name);
+    pthread_mutex_unlock(&mutex);                       //释放锁
+    return ServerName;
+}

@@ -12,16 +12,16 @@
 #include<string>
 #include<iomanip>
 #include<sstream>
-#define CONFIRM_NUM (0x114514)
-#define PAYLOAD_LENGTH (0x200)
-#define PACKET_LENGTH (PAYLOAD_LENGTH+sizeof(uint32_t)+sizeof(short)+sizeof(int)*2)
-#define ServerId (0)
-#define GetTime ('1')
-#define GetServerName ('2')
-#define GetClientList ('3')
-#define SendMessage ('4')
-#define Disconnect ('5')
-#define Err ('6')
+#define CONFIRM_NUM (0x114514)                                                                      //数据包确认号
+#define PAYLOAD_LENGTH (0x200)                                                                      //payload最大长度
+#define PACKET_LENGTH (PAYLOAD_LENGTH+sizeof(uint32_t)+sizeof(short)+sizeof(int)*2)                 //数据包长度
+#define ServerId (0)                                                                                //服务端id号
+#define GetTime ('1')                                                                               //获取时间
+#define GetServerName ('2')                                                                         //获取服务器名字
+#define GetClientList ('3')                                                                         //获取客户端列表
+#define SendMessage ('4')                                                                           //发送消息
+#define Disconnect ('5')                                                                            //断开连接
+#define Err ('6')                                                                                   //发生错误
 
 struct packet {
     uint32_t confirm_num{CONFIRM_NUM};                                                              //反序列化时确认是否正确
@@ -33,7 +33,7 @@ struct packet {
 
 char* serialize(struct packet message)                                                              //数据包序列化函数
 {
-    char* string_out = (char*)malloc(PACKET_LENGTH);                                                //? 内存泄露问题，在调用后释放内存
+    char* string_out = (char*)malloc(PACKET_LENGTH);                                                //?内存泄露问题，在调用后释放内存
     std::stringstream ss;
     ss << std::hex << std::setfill('0') << std::setw(sizeof(uint32_t)) << message.confirm_num;
     ss << std::hex << std::setfill('0') << std::setw(sizeof(short)) << message.command;
@@ -47,7 +47,7 @@ struct packet* deserializa(char* string_in)                                     
 {
     int i{0};
     char ss[sizeof(int)];
-    struct packet* message = (struct packet*)malloc(sizeof(struct packet));                         //? 内存泄露问题，在调用后释放内存
+    struct packet* message = (struct packet*)malloc(sizeof(struct packet));                         //?内存泄露问题，在调用后释放内存
     strncpy(ss, string_in+i, sizeof(uint32_t));
     i+=sizeof(uint32_t);
     message->confirm_num = static_cast<uint32_t>(std::stoul(ss));
