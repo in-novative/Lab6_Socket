@@ -93,18 +93,18 @@ void *receive(void* id)
     struct packet message = {CONFIRM_NUM,SendMessage,ServerId,client_id,*payload};
     char* ss_ptr = serialize(message);                                                                      //序列化待发送数据包
     strncpy(payload, ss_ptr, PACKET_LENGTH);
-    free(ss_ptr);
+    delete ss_ptr;
     while(pthread_mutex_trylock(&mutex)){}                                                                  //加锁
     send(client[client_id]._socket, (void*)(payload), PACKET_LENGTH, 0);                                    //发送连接成功确认，告知客户端id
     pthread_mutex_unlock(&mutex);                                                                           //释放锁
     while(1){
-        ss_ptr = (char*)malloc(PACKET_LENGTH);
+        ss_ptr = new char[PACKET_LENGTH];
         if(recv(client[client_id]._socket, (void*)&ss_ptr, PACKET_LENGTH, 0) != PACKET_LENGTH){             //数据包长度错误
             std::cerr << "[Error]: Recv Length Error" << std::endl;
             continue;
         }
         strncpy((char*)&receive_packet, ss_ptr, PACKET_LENGTH);                                             //反序列化接收到的数据包
-        free(ss_ptr);
+        delete ss_ptr;
         if(receive_packet.confirm_num != CONFIRM_NUM){                                                      //反序列化确认号错误
             std::cerr << "[Error]: Deserialize Failed" << std::endl;
             continue;

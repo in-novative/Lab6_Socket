@@ -33,7 +33,7 @@ struct packet {
 
 char* serialize(struct packet message)                                                              //数据包序列化函数
 {
-    char* string_out = (char*)malloc(PACKET_LENGTH);                                                //?内存泄露问题，在调用后释放内存
+    char* string_out = new char[PACKET_LENGTH];                                                //?内存泄露问题，在调用后释放内存
     std::stringstream ss;
     ss << std::hex << std::setfill('0') << std::setw(sizeof(uint32_t)) << message.confirm_num;
     ss << std::hex << std::setfill('0') << std::setw(sizeof(short)) << message.command;
@@ -47,7 +47,7 @@ struct packet* deserializa(char* string_in)                                     
 {
     int i{0};
     char ss[sizeof(int)];
-    struct packet* message = (struct packet*)malloc(sizeof(struct packet));                         //?内存泄露问题，在调用后释放内存
+    struct packet* message = new packet();                         //?内存泄露问题，在调用后释放内存
     strncpy(ss, string_in+i, sizeof(uint32_t));
     i+=sizeof(uint32_t);
     message->confirm_num = static_cast<uint32_t>(std::stoul(ss));
