@@ -11,47 +11,56 @@
 #define PACKET_H
 #include<string>
 #include<iomanip>
-#include <sstream>
-#define CONFIRM_NUM 0x114514
+#include<sstream>
+#define CONFIRM_NUM (0x114514)
+#define PAYLOAD_LENGTH (0x200)
+#define PACKET_LENGTH (PAYLOAD_LENGTH+sizeof(uint32_t)+sizeof(short)+sizeof(int)*2)
+#define ServerId (0)
+#define GetTime ('1')
+#define GetServerName ('2')
+#define GetClientList ('3')
+#define SendMessage ('4')
+#define Disconnect ('5')
+#define Err ('6')
 
 struct packet {
-    uint32_t confirm_num{CONFIRM_NUM};      //反序列化时确认是否正确
-    short command;                //命令类型
-    int dest;                   //消息的目标地址(默认为0，消息转发时为目标id)
-    int length;                 //payload长度(单位为字节)
-    std::string payload;
-}; // 自定义的数据包格式
+    uint32_t confirm_num{CONFIRM_NUM};                                                              //反序列化时确认是否正确
+    short command;                                                                                  //命令类型
+    int src;                                                                                        //消息的源地址
+    int dst;                                                                                        //消息的目标地址(服务器为0，消息转发时为目标id)
+    char payload[PAYLOAD_LENGTH];
+};                                                                                                  // 自定义的数据包格式
 
-std::string serialize(struct packet message)
+char* serialize(struct packet message)                                                              //数据包序列化函数
 {
-    std::string string_out;
+    char* string_out = (char*)malloc(PACKET_LENGTH);                                                //? 内存泄露问题，在调用后释放内存
     std::stringstream ss;
     ss << std::hex << std::setfill('0') << std::setw(sizeof(uint32_t)) << message.confirm_num;
     ss << std::hex << std::setfill('0') << std::setw(sizeof(short)) << message.command;
-    ss << std::hex << std::setfill('0') << std::setw(sizeof(int)) << message.dest;
-    ss << std::hex << std::setfill('0') << std::setw(sizeof(int)) << message.length;
-    string_out = ss.str() + message.payload;
+    ss << std::hex << std::setfill('0') << std::setw(sizeof(int)) << message.src;
+    ss << std::hex << std::setfill('0') << std::setw(sizeof(int)) << message.dst;
+    strncat(string_out, ss.str().c_str(),ss.str().length());
+    strncat(string_out, message.payload, PAYLOAD_LENGTH);
     return string_out;
 }
-struct packet deserializa(std::string string_in)
+struct packet* deserializa(char* string_in)                                                         //数据包反序列化函数
 {
     int i{0};
-    struct packet message;
-    std::stringstream ss;
-    ss << std::hex << string_in.substr(i, i+=sizeof(uint32_t));
-    ss >> message.confirm_num;
-    ss.str() = "";
-    ss << std::hex << string_in.substr(i, i+=sizeof(short));
-    ss >> message.command;
-    ss.str() = "";
-    ss << std::hex << string_in.substr(i, i+=sizeof(int));
-    ss >> message.dest;
-    ss.str() = "";
-    ss << std::hex << string_in.substr(i, i+=sizeof(int));
-    ss >> message.length;
-    ss.str() = "";
-    ss << string_in.substr(i, message.length);
-    message.payload = ss.str();
+    char ss[sizeof(int)];
+    struct packet* message = (struct packet*)malloc(sizeof(struct packet));                         //? 内存泄露问题，在调用后释放内存
+    strncpy(ss, string_in+i, sizeof(uint32_t));
+    i+=sizeof(uint32_t);
+    message->confirm_num = static_cast<uint32_t>(std::stoul(ss));
+    strncpy(ss, string_in+i, sizeof(short));
+    i+=sizeof(short);
+    message->command = static_cast<short>(std::stoi(ss));
+    strncpy(ss, string_in+i, sizeof(int));
+    i+=sizeof(int);
+    message->src = static_cast<int>(std::stoi(ss));
+    strncpy(ss, string_in+i, sizeof(int));
+    i+=sizeof(int);
+    message->dst = static_cast<int>(std::stoi(ss));
+    strncpy(message->payload, string_in+i, PAYLOAD_LENGTH);
     return message;
 }
 #endif
