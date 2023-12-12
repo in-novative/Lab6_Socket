@@ -35,9 +35,8 @@ int main()
     while(!_is_connected){
         std::cout << "请输入连接主机名\n";
         std::cin >> server._name;
-        std::cout << "\n请输入连接端口\n";
+        std::cout << "请输入连接端口\n";
         std::cin >> server._port;
-        std::cout << std::endl;
         _is_connected = connect(server._socket,server._port);                                           //连接到目标端口，设置主机名
     }
                                                                                                         //!主线程循环调用accept()，直到返回一个有效的socket句柄
