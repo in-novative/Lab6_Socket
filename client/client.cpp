@@ -84,7 +84,7 @@ int main() {
 		cout << "7)\tExit" << endl;
 		cout << ">>";
 
-		scanf("%c",&option);
+		scanf("%d",&option);
 		fflush(stdin);
 		// 如果option的数值超出范围，或者在未连接server的情况下发送请求，则报错 
 		if (option < 1 || option > 7 || (!connectedToServer && 2 <= option && option <= 6)) {
@@ -92,22 +92,22 @@ int main() {
 			continue;
 		}
 		// 否则正常执行 
-		if (option == '1')
+		if (option == 1)
 			Connect();
-		else if (option == '2')
+		else if (option == 2)
 			Close();
-		else if (option >= '3' && option <= '5'){
-			if(option == '5')
+		else if (option >= 3 && option <= 5){
+			if(option == 5)
 				is_get_clist = true;
 			Request(option); // 调用Request获得时间、名字、客户端列表			
 		}
-		else if (option == '6'){
+		else if (option == 6){
 			if(is_get_clist)
 				Send();
 			else
 				printf("You shoule first get the client list before sending any message!\n"); 
 		}
-		else if (option == '7'){
+		else if (option == 7){
 			if (connectedToServer){
 				Close();							
 			}
@@ -212,6 +212,7 @@ void Connect() {
 	saServer.sin_family = AF_INET;
 	saServer.sin_port = htons(port); 
 	saServer.sin_addr.S_un.S_addr = inet_addr(ip);
+	printf("%s\n", ((struct sockaddr*)&saServer)->sa_data);
 
 	// 判断能否建立连接 
 	int ret = connect(c_socket, (struct sockaddr *)&saServer, sizeof(saServer));

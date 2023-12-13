@@ -42,13 +42,16 @@ int main()
                                                                                                         //!主线程循环调用accept()，直到返回一个有效的socket句柄
     server._socket_length = sizeof(server._socket);
     while(1){
+        std::cout << "waiting for connection" << std::endl;
         sockaddr client_addr;
-        int new_socket = accept(server._socket, &client_addr, &server._socket_length);                  //?server的写操作均发生在创建新线程前，无需加锁
+        socklen_t addr_len = sizeof(client_addr);
+        int new_socket = accept(server._socket, &client_addr, &addr_len);                               //?server的写操作均发生在创建新线程前，无需加锁
         if(new_socket < 0){                                                                             //申请新句柄失败
             //std::cerr << "[Error]: Server Accept Failed" << std::endl;
             continue;
         }
         else {                                                                                          //申请新句柄成功,有新的客户端连接
+            std::cout << "successfully connected" << std::endl;
                                                                                                         //!增加一个新客户端的项目，并记录下该客户端句柄和连接状态、端口
             while(pthread_mutex_trylock(&mutex)){}                                                      //加锁
             pthread_t thread;
@@ -66,11 +69,11 @@ int main()
 
 bool connect(int socket, uint16_t port){
                                                                                                         //!调用bind()，绑定监听端口
-    sockaddr_in _server_addr = {AF_INET, htons(port), inet_addr("127.0.0.1")};
-    sockaddr server_addr;
-    strncpy(reinterpret_cast<char*>(&server_addr), reinterpret_cast<char*>(&_server_addr), sizeof(_server_addr));
-    const sockaddr ss_ptr = server_addr;
-    if(bind(socket, &ss_ptr, sizeof(_server_addr)) < 0) {                                               //监听端口绑定失败
+    sockaddr_in _server_addr;
+    _server_addr.sin_family = AF_INET;
+    _server_addr.sin_port = htons(port);
+    _server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    if(bind(socket, (struct sockaddr*)&_server_addr, sizeof(_server_addr)) < 0) {                                               //监听端口绑定失败
         std::cerr << "[Error]: Server Bind Failed" << std::endl; 
         return false;
     }
@@ -99,7 +102,7 @@ void *receive(void* id)
     while(1){
         ss_ptr = new char[PACKET_LENGTH];
         if(recv(client[client_id]._socket, (void*)&ss_ptr, PACKET_LENGTH, 0) != PACKET_LENGTH){             //数据包长度错误
-            std::cerr << "[Error]: Recv Length Error" << std::endl;
+            //std::cerr << "[Error]: Recv Length Error" << std::endl;
             continue;
         }
         memcpy((char*)&receive_packet, (char*)deserialize(ss_ptr), PACKET_LENGTH);                          //反序列化接收到的数据包
@@ -112,9 +115,11 @@ void *receive(void* id)
             std::cerr << "[Error]: Client Id Error" << std::endl;
             continue;
         }
+        std::cout << "receive a packet" << std::endl;
                                                                                                             //!收到一个完整的包
         switch(receive_packet.command){
             case GetTime:{                                                                                  //获取时间
+                std::cout << "application for time" << std::endl;
                 if(receive_packet.dst==ServerId && client.find(receive_packet.src)!=client.end()){
                     struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, receive_packet.src, *_GetTime().c_str()};
                     send(client[receive_packet.src]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
@@ -122,6 +127,7 @@ void *receive(void* id)
                 break;
             }
             case GetServerName:{                                                                            //获取主机名
+                std::cout << "application for server name" << std::endl;
                 if(receive_packet.dst==ServerId && client.find(receive_packet.src)!=client.end()){
                     struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, receive_packet.src, *_GetClientList().c_str()};
                     send(client[receive_packet.src]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
@@ -129,6 +135,7 @@ void *receive(void* id)
                 break;
             }
             case GetClientList:{                                                                            //获取客户端列表
+                std::cout << "application for client list" << std::endl;
                 if(receive_packet.dst==ServerId && client.find(receive_packet.src)!=client.end()){
                     struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, receive_packet.src, *_GetServerName().c_str()};
                     send(client[receive_packet.src]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
