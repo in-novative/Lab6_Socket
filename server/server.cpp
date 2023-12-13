@@ -6,10 +6,10 @@ c)向客户端传送当前连接的所有客户端信息
 d)将某客户端发送过来的内容转发给指定编号的其他客户端
 e)采用异步多线程编程模式，正确处理多个客户端同时连接，同时发送消息的情况
 */
-#include<iostream>
-#include<pthread.h>
-#include"server_header.h"
-#include"../packet.h"
+#include <iostream>
+#include <pthread.h>
+#include "server_header.h"
+#include "../packet.h"
 
 void *receive(void* id);                                                                                //子进程入口函数
 bool connect(int socket, uint16_t port);                                                                //主机连接到目标端口
@@ -102,7 +102,7 @@ void *receive(void* id)
             std::cerr << "[Error]: Recv Length Error" << std::endl;
             continue;
         }
-        strncpy((char*)&receive_packet, ss_ptr, PACKET_LENGTH);                                             //反序列化接收到的数据包
+        memcpy((char*)&receive_packet, (char*)deserialize(ss_ptr), PACKET_LENGTH);                          //反序列化接收到的数据包
         delete ss_ptr;
         if(receive_packet.confirm_num != CONFIRM_NUM){                                                      //反序列化确认号错误
             std::cerr << "[Error]: Deserialize Failed" << std::endl;

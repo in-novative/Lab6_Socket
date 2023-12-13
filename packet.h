@@ -9,9 +9,9 @@
 */
 #ifndef PACKET_H
 #define PACKET_H
-#include<string>
-#include<iomanip>
-#include<sstream>
+#include <string>
+#include <iomanip>
+#include <sstream>
 #define CONFIRM_NUM (0x114514)                                                                      //数据包确认号
 #define PAYLOAD_LENGTH (0x200)                                                                      //payload最大长度
 #define PACKET_LENGTH (PAYLOAD_LENGTH+sizeof(uint32_t)+sizeof(short)+sizeof(int)*2)                 //数据包长度
@@ -43,7 +43,7 @@ char* serialize(struct packet message)                                          
     strncat(string_out, message.payload, PAYLOAD_LENGTH);
     return string_out;
 }
-struct packet* deserializa(char* string_in)                                                         //数据包反序列化函数
+struct packet* deserialize(const char* string_in)                                                         //数据包反序列化函数
 {
     int i{0};
     char ss[sizeof(int)];
