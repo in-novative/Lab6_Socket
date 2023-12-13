@@ -89,7 +89,7 @@ void *receive(void* id)
     struct packet receive_packet;
                                                                                                             //!调用send()，发送一个hello消息给客户端
     char payload[PAYLOAD_LENGTH] = "Successfully Connect";
-    struct packet message = {CONFIRM_NUM,SendMessage,ServerId,client_id,*payload};
+    struct packet message = {CONFIRM_NUM,SendMessages,ServerId,client_id,*payload};
     char* ss_ptr = serialize(message);                                                                      //序列化待发送数据包
     strncpy(payload, ss_ptr, PACKET_LENGTH);
     delete ss_ptr;
@@ -135,7 +135,7 @@ void *receive(void* id)
                 }
                 break;
             }
-            case SendMessage:{                                                                              //发送消息(暂时只处理转发)
+            case SendMessages:{                                                                              //发送消息(暂时只处理转发)
                 if(client.find(receive_packet.src)!=client.end() && client.find(receive_packet.dst)!=client.end()){
                     struct packet message = {CONFIRM_NUM, receive_packet.command, receive_packet.src, receive_packet.dst, *receive_packet.payload};
                     send(client[receive_packet.dst]._socket, (void*)serialize(message), PACKET_LENGTH, 0);

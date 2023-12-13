@@ -1,3 +1,4 @@
+//编译时加上参数-lwsock32
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
@@ -6,7 +7,8 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <string>
-#include "packet.h"
+#include <cstdint>
+#include "../packet.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -16,7 +18,7 @@ using namespace std;
 
 void Connect();
 void Close();
-void Request(int);              	//request information from server
+void Request(short);              	//request information from server
 void Send();	                	//sending message to other clients
 void Exit();
 void alterLock(bool);           	//change the state whether the request is satisfied
@@ -329,4 +331,12 @@ void Send() {
 		pthread_mutex_unlock(&mutex);
 		Sleep(waitTime);
 	}
+}
+
+void Exit()
+{
+	if (connectedToServer)
+		Close();
+	//is_exit = true;
+	exit(0);
 }

@@ -19,7 +19,7 @@
 #define GetTime ('1')                                                                               //获取时间
 #define GetServerName ('2')                                                                         //获取服务器名字
 #define GetClientList ('3')                                                                         //获取客户端列表
-#define SendMessage ('4')                                                                           //发送消息
+#define SendMessages ('4')                                                                          //发送消息
 #define Disconnect ('5')                                                                            //断开连接
 #define Err ('6')                                                                                   //发生错误
 
@@ -33,7 +33,7 @@ struct packet {
 
 char* serialize(struct packet message)                                                              //数据包序列化函数
 {
-    char* string_out = new char[PACKET_LENGTH];                                                //?内存泄露问题，在调用后释放内存
+    char* string_out = new char[PACKET_LENGTH];                                                     //?内存泄露问题，在调用后释放内存
     std::stringstream ss;
     ss << std::hex << std::setfill('0') << std::setw(sizeof(uint32_t)) << message.confirm_num;
     ss << std::hex << std::setfill('0') << std::setw(sizeof(short)) << message.command;
@@ -43,11 +43,11 @@ char* serialize(struct packet message)                                          
     strncat(string_out, message.payload, PAYLOAD_LENGTH);
     return string_out;
 }
-struct packet* deserialize(const char* string_in)                                                         //数据包反序列化函数
+struct packet* deserialize(const char* string_in)                                                   //数据包反序列化函数
 {
     int i{0};
     char ss[sizeof(int)];
-    struct packet* message = new packet();                         //?内存泄露问题，在调用后释放内存
+    struct packet* message = new packet();                                                          //?内存泄露问题，在调用后释放内存
     strncpy(ss, string_in+i, sizeof(uint32_t));
     i+=sizeof(uint32_t);
     message->confirm_num = static_cast<uint32_t>(std::stoul(ss));
