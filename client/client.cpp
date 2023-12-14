@@ -275,13 +275,16 @@ void Request(short option) {
 	// 创建发送所需信息的packet
 	struct packet pack;
 	//pack.confirm_num = CONFIRM_NUM; // Set confirm_num member
-	pack.command = type;
-	pack.src = ServerId;
-	pack.dst = ClientId;
-	strcpy(pack.payload, ""); 
+	pack.command = option + '0';
+	pack.src = ClientId;
+	pack.dst = ServerId;
+	//strcpy(pack.payload, ""); 
 
-	string pstr = serialize(pack); // string类和char* 的区别？ 
-	send(c_socket, pstr.c_str(), pstr.size(), 0);
+	//string pstr = serialize(pack); // string类和char* 的区别？ 
+	//send(c_socket, pstr.c_str(), pstr.size(), 0);
+	char pstr[PACKET_LENGTH];
+	memcpy(pstr, serialize(pack), PACKET_LENGTH);
+	send(c_socket, pstr, PACKET_LENGTH, 0);
 
 	alterLock(true);	
 	for(;;) { // 等待回复，直到收到packet

@@ -28,7 +28,7 @@ struct packet {
     short command;                                                                                  //命令类型
     int src;                                                                                        //消息的源地址
     int dst;                                                                                        //消息的目标地址(服务器为0，消息转发时为目标id)
-    char payload[PAYLOAD_LENGTH];
+    char payload[PAYLOAD_LENGTH]="";
 };                                                                                                  // 自定义的数据包格式
 
 char* serialize(struct packet message)                                                              //数据包序列化函数
@@ -39,7 +39,7 @@ char* serialize(struct packet message)                                          
     ss << std::hex << std::setfill('0') << std::setw(sizeof(short)) << message.command;
     ss << std::hex << std::setfill('0') << std::setw(sizeof(int)) << message.src;
     ss << std::hex << std::setfill('0') << std::setw(sizeof(int)) << message.dst;
-    strncat(string_out, ss.str().c_str(),ss.str().length());
+    strncpy(string_out, ss.str().c_str(),strlen(ss.str().c_str()));
     strncat(string_out, message.payload, PAYLOAD_LENGTH);
     return string_out;
 }

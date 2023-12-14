@@ -101,8 +101,8 @@ void *receive(void* id)
     pthread_mutex_unlock(&mutex);                                                                           //释放锁
     while(1){
         ss_ptr = new char[PACKET_LENGTH];
-        if(recv(client[client_id]._socket, (void*)&ss_ptr, PACKET_LENGTH, 0) != PACKET_LENGTH){             //数据包长度错误
-            //std::cerr << "[Error]: Recv Length Error" << std::endl;
+        if(recv(client[client_id]._socket, (void*)&ss_ptr, PACKET_LENGTH, 0) == -1){                        //未收到数据包
+            delete ss_ptr;
             continue;
         }
         memcpy((char*)&receive_packet, (char*)deserialize(ss_ptr), PACKET_LENGTH);                          //反序列化接收到的数据包
@@ -111,10 +111,10 @@ void *receive(void* id)
             std::cerr << "[Error]: Deserialize Failed" << std::endl;
             continue;
         }
-        if(receive_packet.src != client_id){                                                                //客户端id错误
-            std::cerr << "[Error]: Client Id Error" << std::endl;
-            continue;
-        }
+        //if(receive_packet.src != client_id){                                                                //客户端id错误
+        //    std::cerr << "[Error]: Client Id Error" << std::endl;
+        //    continue;
+        //}
         std::cout << "receive a packet" << std::endl;
                                                                                                             //!收到一个完整的包
         switch(receive_packet.command){
