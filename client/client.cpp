@@ -13,7 +13,7 @@
 #pragma comment(lib, "ws2_32.lib")
 
 #define MAX_LENGTH 1024         //数据包最大长度
-#define ClientId (-1)
+#define ClientId (0x99)
 using namespace std;
 
 void Connect();

@@ -42,27 +42,26 @@ int main()
                                                                                                         //!主线程循环调用accept()，直到返回一个有效的socket句柄
     server._socket_length = sizeof(server._socket);
     while(1){
-        std::cout << "waiting for connection" << std::endl;
         sockaddr client_addr;
         socklen_t addr_len = sizeof(client_addr);
         int new_socket = accept(server._socket, &client_addr, &addr_len);                               //?server的写操作均发生在创建新线程前，无需加锁
         if(new_socket < 0){                                                                             //申请新句柄失败
-            //std::cerr << "[Error]: Server Accept Failed" << std::endl;
             continue;
         }
         else {                                                                                          //申请新句柄成功,有新的客户端连接
-            std::cout << "successfully connected" << std::endl;
+            std::cout << "[Info]: successfully connected" << std::endl;
                                                                                                         //!增加一个新客户端的项目，并记录下该客户端句柄和连接状态、端口
             while(pthread_mutex_trylock(&mutex)){}                                                      //加锁
             pthread_t thread;
-            if(pthread_create(&thread, NULL, receive, (void*)&new_socket)){                             //子进程创建失败
+            if(pthread_create(&thread, NULL, receive, (void*)&++id)){                             //子进程创建失败
                 std::cerr << "[Error]: Thread Creation Failed" << std::endl;
                 pthread_mutex_unlock(&mutex);                                                           //释放锁
                 continue;
             }
             struct client_info new_client = {client_addr, new_socket, sizeof(new_socket), thread};      //记录新添加客户端的信息
-            client.insert(std::make_pair(++id, new_client));                                            //添加id和客户端信息的键值对
+            client.insert(std::make_pair(id, new_client));                                            //添加id和客户端信息的键值对
             pthread_mutex_unlock(&mutex);                                                               //释放锁
+            std::cout << "[Info]: client " << id << " create a new thread" << std::endl;
         }
     }
 }
@@ -92,17 +91,15 @@ void *receive(void* id)
     struct packet receive_packet;
                                                                                                             //!调用send()，发送一个hello消息给客户端
     char payload[PAYLOAD_LENGTH] = "Successfully Connect";
-    struct packet message = {CONFIRM_NUM,SendMessages,ServerId,client_id,*payload};
-    char* ss_ptr = serialize(message);                                                                      //序列化待发送数据包
+    struct packet message = {CONFIRM_NUM,SendMessages,ServerId,client_id,payload};
+    char *ss_ptr = new char[PACKET_LENGTH];
+    memcpy(ss_ptr, serialize(message), PACKET_LENGTH);                                                                    //序列化待发送数据包
     strncpy(payload, ss_ptr, PACKET_LENGTH);
-    delete ss_ptr;
     while(pthread_mutex_trylock(&mutex)){}                                                                  //加锁
     send(client[client_id]._socket, (void*)(payload), PACKET_LENGTH, 0);                                    //发送连接成功确认，告知客户端id
     pthread_mutex_unlock(&mutex);                                                                           //释放锁
     while(1){
-        ss_ptr = new char[PACKET_LENGTH];
-        if(recv(client[client_id]._socket, (void*)&ss_ptr, PACKET_LENGTH, 0) == -1){                        //未收到数据包
-            delete ss_ptr;
+        if(recv(client[client_id]._socket, (void*)ss_ptr, PACKET_LENGTH, 0) == -1){                        //未收到数据包
             continue;
         }
         memcpy((char*)&receive_packet, (char*)deserialize(ss_ptr), PACKET_LENGTH);                          //反序列化接收到的数据包
@@ -111,47 +108,47 @@ void *receive(void* id)
             std::cerr << "[Error]: Deserialize Failed" << std::endl;
             continue;
         }
-        //if(receive_packet.src != client_id){                                                                //客户端id错误
+        //if(client_id != client_id){                                                                //客户端id错误
         //    std::cerr << "[Error]: Client Id Error" << std::endl;
         //    continue;
         //}
-        std::cout << "receive a packet" << std::endl;
+        std::cout << "[Info]: receive a packet" << std::endl;
                                                                                                             //!收到一个完整的包
         switch(receive_packet.command){
             case GetTime:{                                                                                  //获取时间
-                std::cout << "application for time" << std::endl;
-                if(receive_packet.dst==ServerId && client.find(receive_packet.src)!=client.end()){
-                    struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, receive_packet.src, *_GetTime().c_str()};
-                    send(client[receive_packet.src]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
+                std::cout << "[Info]: application for time" << std::endl;
+                if(receive_packet.dst==ServerId && client.find(client_id)!=client.end()){
+                    struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, client_id, (char*)_GetTime().c_str()};
+                    send(client[client_id]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
                 }
                 break;
             }
             case GetServerName:{                                                                            //获取主机名
-                std::cout << "application for server name" << std::endl;
-                if(receive_packet.dst==ServerId && client.find(receive_packet.src)!=client.end()){
-                    struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, receive_packet.src, *_GetClientList().c_str()};
-                    send(client[receive_packet.src]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
+                std::cout << "[Info]: application for server name" << std::endl;
+                if(receive_packet.dst==ServerId && client.find(client_id)!=client.end()){
+                    struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, client_id, (char*)_GetClientList().c_str()};
+                    send(client[client_id]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
                 }
                 break;
             }
             case GetClientList:{                                                                            //获取客户端列表
-                std::cout << "application for client list" << std::endl;
-                if(receive_packet.dst==ServerId && client.find(receive_packet.src)!=client.end()){
-                    struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, receive_packet.src, *_GetServerName().c_str()};
-                    send(client[receive_packet.src]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
+                std::cout << "[Info]: application for client list" << std::endl;
+                if(receive_packet.dst==ServerId && client.find(client_id)!=client.end()){
+                    struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, client_id, (char*)_GetServerName().c_str()};
+                    send(client[client_id]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
                 }
                 break;
             }
             case SendMessages:{                                                                              //发送消息(暂时只处理转发)
-                if(client.find(receive_packet.src)!=client.end() && client.find(receive_packet.dst)!=client.end()){
-                    struct packet message = {CONFIRM_NUM, receive_packet.command, receive_packet.src, receive_packet.dst, *receive_packet.payload};
+                if(client.find(client_id)!=client.end() && client.find(receive_packet.dst)!=client.end()){
+                    struct packet message = {CONFIRM_NUM, receive_packet.command, client_id, receive_packet.dst, receive_packet.payload};
                     send(client[receive_packet.dst]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
                 }
                 break;
             }
             case Disconnect:{                                                                               //断开连接
-                if(receive_packet.dst==ServerId && client.find(receive_packet.src)!=client.end()){
-                    client.erase(receive_packet.src);                                                       //删除client中的键值对
+                if(receive_packet.dst==ServerId && client.find(client_id)!=client.end()){
+                    client.erase(client_id);                                                       //删除client中的键值对
                     _Exit(0);                                                                               //退出子进程
                 }
                 break;
@@ -181,7 +178,7 @@ std::string _GetClientList()                            //格式为 序号: 1   
     while(pthread_mutex_trylock(&mutex)){}              //加锁
     std::string ClientList;
     for(int i=0; i<id; i++){
-        std::string clientInfo = "序号: " + std::to_string(i) + "\t" + "地址: " + client[i]._addr.sa_data + "\n";
+        std::string clientInfo = "id: " + std::to_string(i) + "  " + "addr: " + client[i]._addr.sa_data + "\n";
         ClientList += clientInfo;
     }
     pthread_mutex_unlock(&mutex);                       //释放锁
@@ -191,7 +188,7 @@ std::string _GetClientList()                            //格式为 序号: 1   
 std::string _GetServerName()
 {
     while(pthread_mutex_trylock(&mutex)){}              //加锁
-    std::string ServerName(server._name);
+    std::string ServerName(server._name);   
     pthread_mutex_unlock(&mutex);                       //释放锁
     return ServerName;
 }
