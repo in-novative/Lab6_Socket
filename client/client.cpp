@@ -131,8 +131,8 @@ void *receive(void *args) {
 	// 通过循环不断接收从客户端传来的数据，并对接收到的数据进行处理
 	while (true)
 	{
-		char buffer_recv[MAX_LENGTH] = {0};
-		int ret = recv(*c_socket,buffer_recv,MAX_LENGTH,0);   // 通过 recv 函数接收数据
+		char buffer_recv[PACKET_LENGTH];
+		int ret = recv(*c_socket,buffer_recv,PACKET_LENGTH,0);   // 通过 recv 函数接收数据
 		if (ret == SOCKET_ERROR || ret == 0)				  // 如果出错或是接收完毕就退出 
 			break;
 			
@@ -162,25 +162,22 @@ void *receive(void *args) {
         		case '1': { //时间
             		printf("Current server time: %s\n", pack->payload);
             		time_reply_count++;
-            		printf("time reply count:%d\n",time_reply_count);
+            		printf("time reply count: %d\n",time_reply_count);
 					alterLock(false);
            	 		break;
         		}
         		case '2': { //名字
-					puts("Client computer name: ");
-            		printf("%s\n", pack->payload);
+            		printf("Server name: %s\n", pack->payload);
 					alterLock(false);
             		break;
         		}
         		case '3': { //客户端列表
-            		puts("Client list:");
-					printf("%s\n", pack->payload);
+					printf("Client list: %s\n", pack->payload);
 					alterLock(false);
             		break;
        			}
         		case '4': { //发送消息
-        			puts("Message:");
-            		printf("%s\n", pack->payload);
+            		printf("Message: %s\n", pack->payload);
 					alterLock(false);
             		break;
         		}
@@ -270,15 +267,15 @@ void Request(short option) {
 	short type = option - 2;
 	//option == 3，type = 1;        //time:1
 	//option == 4，type = 2;        //name:2
-	//option == 5，type = 3;        //client list:110
+	//option == 5，type = 3;        //client list:3
 	
 	// 创建发送所需信息的packet
 	struct packet pack;
 	//pack.confirm_num = CONFIRM_NUM; // Set confirm_num member
-	pack.command = option + '0';
+	pack.command = type + '0';
 	pack.src = ClientId;
 	pack.dst = ServerId;
-	//strcpy(pack.payload, ""); 
+	memset(pack.payload, 0, PAYLOAD_LENGTH);
 
 	//string pstr = serialize(pack); // string类和char* 的区别？ 
 	//send(c_socket, pstr.c_str(), pstr.size(), 0);
@@ -313,13 +310,12 @@ void Send() {
 	fflush(stdin);
 	const char* content = buf;
 
-	int server_id = 0; 
 	// 给server发送一个packet 
 	struct packet pack;
 	//pack.confirm_num = CONFIRM_NUM; 
-	pack.command = 4;
-	pack.src = client_id;
-	pack.dst = ServerId;
+	pack.command = SendMessages;
+	pack.src = ClientId;
+	pack.dst = client_id;
 	strcpy(pack.payload, content);
 	
 	string pstr = serialize(pack);  // string类和char* 的区别？ 

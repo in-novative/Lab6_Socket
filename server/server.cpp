@@ -53,13 +53,15 @@ int main()
                                                                                                         //!增加一个新客户端的项目，并记录下该客户端句柄和连接状态、端口
             while(pthread_mutex_trylock(&mutex)){}                                                      //加锁
             pthread_t thread;
-            if(pthread_create(&thread, NULL, receive, (void*)&++id)){                             //子进程创建失败
+            id++;
+            if(pthread_create(&thread, NULL, receive, (void*)&id)){                                     //子进程创建失败
+                id--;
                 std::cerr << "[Error]: Thread Creation Failed" << std::endl;
                 pthread_mutex_unlock(&mutex);                                                           //释放锁
                 continue;
             }
             struct client_info new_client = {client_addr, new_socket, sizeof(new_socket), thread};      //记录新添加客户端的信息
-            client.insert(std::make_pair(id, new_client));                                            //添加id和客户端信息的键值对
+            client.insert(std::make_pair(id, new_client));                                              //添加id和客户端信息的键值对
             pthread_mutex_unlock(&mutex);                                                               //释放锁
             std::cout << "[Info]: client " << id << " create a new thread" << std::endl;
         }
@@ -112,13 +114,18 @@ void *receive(void* id)
         //    std::cerr << "[Error]: Client Id Error" << std::endl;
         //    continue;
         //}
-        std::cout << "[Info]: receive a packet" << std::endl;
+        std::cout << "[Info]: receive a packet from client " << client_id << std::endl;
                                                                                                             //!收到一个完整的包
         switch(receive_packet.command){
             case GetTime:{                                                                                  //获取时间
                 std::cout << "[Info]: application for time" << std::endl;
                 if(receive_packet.dst==ServerId && client.find(client_id)!=client.end()){
-                    struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, client_id, (char*)_GetTime().c_str()};
+                    struct packet message;
+                    message.confirm_num = CONFIRM_NUM;
+                    message.command = receive_packet.command;
+                    message.src = ServerId;
+                    message.dst = client_id;
+                    strncpy(message.payload, _GetTime().c_str(), PAYLOAD_LENGTH);
                     send(client[client_id]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
                 }
                 break;
@@ -126,7 +133,12 @@ void *receive(void* id)
             case GetServerName:{                                                                            //获取主机名
                 std::cout << "[Info]: application for server name" << std::endl;
                 if(receive_packet.dst==ServerId && client.find(client_id)!=client.end()){
-                    struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, client_id, (char*)_GetClientList().c_str()};
+                    struct packet message;
+                    message.confirm_num = CONFIRM_NUM;
+                    message.command = receive_packet.command;
+                    message.src = ServerId;
+                    message.dst = client_id;
+                    strncpy(message.payload, _GetServerName().c_str(), PAYLOAD_LENGTH);
                     send(client[client_id]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
                 }
                 break;
@@ -134,20 +146,48 @@ void *receive(void* id)
             case GetClientList:{                                                                            //获取客户端列表
                 std::cout << "[Info]: application for client list" << std::endl;
                 if(receive_packet.dst==ServerId && client.find(client_id)!=client.end()){
-                    struct packet message = {CONFIRM_NUM, receive_packet.command, ServerId, client_id, (char*)_GetServerName().c_str()};
+                    struct packet message;
+                    message.confirm_num = CONFIRM_NUM;
+                    message.command = receive_packet.command;
+                    message.src = ServerId;
+                    message.dst = client_id;
+                    strncpy(message.payload, _GetClientList().c_str(), PAYLOAD_LENGTH);
                     send(client[client_id]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
                 }
                 break;
             }
             case SendMessages:{                                                                              //发送消息(暂时只处理转发)
                 if(client.find(client_id)!=client.end() && client.find(receive_packet.dst)!=client.end()){
-                    struct packet message = {CONFIRM_NUM, receive_packet.command, client_id, receive_packet.dst, receive_packet.payload};
+                    printf("[Info]: message transportation from %d to %d\n", client_id, receive_packet.dst);
+                    struct packet message;
+                    message.confirm_num = CONFIRM_NUM;
+                    message.command = receive_packet.command;
+                    message.src = client_id;
+                    message.dst = receive_packet.dst;
+                    strncpy(message.payload, receive_packet.payload, PAYLOAD_LENGTH);
                     send(client[receive_packet.dst]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
+                }
+                else{
+                    printf("[Info]: cannot find destination %d\n", receive_packet.dst);
+                    struct packet message;
+                    message.confirm_num = CONFIRM_NUM;
+                    message.command = receive_packet.command;
+                    message.src = ServerId;
+                    message.dst = client_id;
+                    strncpy(message.payload, "[Error] cannot find destination, please try again", PAYLOAD_LENGTH);
+                    send(client[client_id]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
                 }
                 break;
             }
             case Disconnect:{                                                                               //断开连接
                 if(receive_packet.dst==ServerId && client.find(client_id)!=client.end()){
+                    struct packet message;
+                    message.confirm_num = CONFIRM_NUM;
+                    message.command = receive_packet.command;
+                    message.src = ServerId;
+                    message.dst = client_id;
+                    strncpy(message.payload, "Successfully Disconnect", PAYLOAD_LENGTH);
+                    send(client[receive_packet.dst]._socket, (void*)serialize(message), PACKET_LENGTH, 0);
                     client.erase(client_id);                                                       //删除client中的键值对
                     _Exit(0);                                                                               //退出子进程
                 }
@@ -168,27 +208,35 @@ std::string _GetTime()
     std::ostringstream ss;
     auto now = std::chrono::system_clock::now();
     std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-    ss << std::put_time(std::localtime(&now_c), "%Y.%m.%d.%H.%M");
+    ss << std::put_time(std::localtime(&now_c), "%Y.%m.%d %H:%M");
     std::string current_time = ss.str();
+    std::cout << "[Info]: current time is " << current_time << std::endl;
     return current_time;
 }
 
-std::string _GetClientList()                            //格式为 序号: 1    地址: 127.0.0.1:8080
+std::string _GetClientList()
 {
     while(pthread_mutex_trylock(&mutex)){}              //加锁
-    std::string ClientList;
-    for(int i=0; i<id; i++){
-        std::string clientInfo = "id: " + std::to_string(i) + "  " + "addr: " + client[i]._addr.sa_data + "\n";
-        ClientList += clientInfo;
+    char *ClientList = new char[PAYLOAD_LENGTH];
+    memset(ClientList, 0, PAYLOAD_LENGTH);
+    for(int i=1; i<=id; i++){
+        char clientInfo[50];
+        memset(clientInfo, 0, 50);
+        snprintf(clientInfo, sizeof(clientInfo), "\tid: %d  addr: ", i);
+        strncat(ClientList, clientInfo, 50);
+        strncat(ClientList, inet_ntoa(((struct sockaddr_in*)&client[i]._addr)->sin_addr), 50);
+        strncat(ClientList, "\n", 50);
     }
     pthread_mutex_unlock(&mutex);                       //释放锁
+    std::cout << "[Info]: client list is\n" << ClientList;
     return ClientList;
 }
 
 std::string _GetServerName()
 {
     while(pthread_mutex_trylock(&mutex)){}              //加锁
-    std::string ServerName(server._name);   
+    std::string ServerName(server._name);
     pthread_mutex_unlock(&mutex);                       //释放锁
+    std::cout << "[Info]: server name is " << ServerName << std::endl;
     return ServerName;
 }

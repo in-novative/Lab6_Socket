@@ -35,7 +35,6 @@ struct packet {
 
 char* serialize(struct packet message)                                                              //数据包序列化函数
 {
-    std::cout << "[Info]: serialize called" << std::endl;
     char* string_out = new char[PACKET_LENGTH];                                                     //?内存泄露问题，在调用后释放内存
     std::stringstream ss;
     ss << std::hex << std::setfill('0') << std::setw(6) << message.confirm_num;
@@ -44,13 +43,11 @@ char* serialize(struct packet message)                                          
     ss << std::hex << std::setfill('0') << std::setw(4) << message.dst;
     strncpy(string_out, ss.str().c_str(),strlen(ss.str().c_str()));
     strncat(string_out, message.payload, PAYLOAD_LENGTH);
-    std::cout << "[Info]: serialize finished" << std::endl;
     return string_out;
 }
 
 struct packet* deserialize(const char* string_in)                                                   //数据包反序列化函数
 {
-    std::cout << "[Info]: deserialize called" << std::endl;
     char *ss = new char[PACKET_LENGTH];
     struct packet* message = new packet();                                                          //?内存泄露问题，在调用后释放内存
     memcpy(ss, string_in, 6);
@@ -64,8 +61,8 @@ struct packet* deserialize(const char* string_in)                               
     memset(ss, 0, PACKET_LENGTH);
     memcpy(ss, string_in+14, 4);
     message->dst = static_cast<int>(std::stoi(ss, nullptr, 16));
-    memcpy(message->payload, string_in+16, PAYLOAD_LENGTH);
-    std::cout << "[Info]: deserialize finished" << std::endl;
+    memset(message->payload, 0, PAYLOAD_LENGTH);
+    memcpy(message->payload, string_in+18, PAYLOAD_LENGTH);
     return message;
 }
 #endif
