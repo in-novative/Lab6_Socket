@@ -22,6 +22,7 @@ void Request(short);              	//request information from server
 void Send();	                	//sending message to other clients
 void Exit();
 void alterLock(bool);           	//change the state whether the request is satisfied
+void mySleep(int second); 
 
 SOCKET c_socket;
 pthread_mutex_t mutex;  			// 线程锁 
@@ -65,23 +66,23 @@ int main() {
 	}
 
 	pthread_mutex_init(&mutex, NULL);					// 初始化线程锁 
-	//is_exit = false;
 
 	// 从用户获得输入
-	while (true)
-	{
+	while (true) {
 		// 菜单
+		if(connectedToServer)
+			cout << "\n";
 		cout << "********************************" << endl;
 		cout << "There are Operation Lists:" << endl;
-		cout << "1)\tConnect" << endl;
+		cout << "(1)\tConnect" << endl;
 		if (connectedToServer) {
-			cout << "2)\tClose" << endl;
-			cout << "3)\tRequest time" << endl;
-			cout << "4)\tRequest name" << endl;
-			cout << "5)\tRequest client list" << endl;
-			cout << "6)\tSend message" << endl;
+			cout << "(2)\tRequest time" << endl;
+			cout << "(3)\tRequest name" << endl;
+			cout << "(4)\tRequest client list" << endl;
+			cout << "(5)\tSend message" << endl;
+			cout << "(6)\tClose" << endl;
 		}
-		cout << "7)\tExit" << endl;
+		cout << "(7)\tExit" << endl;
 		cout << ">>";
 
 		scanf("%d",&option);
@@ -94,25 +95,28 @@ int main() {
 		// 否则正常执行 
 		if (option == 1)
 			Connect();
-		else if (option == 2)
-			Close();
-		else if (option >= 3 && option <= 5){
-			if(option == 5)
+		else if (option >= 2 && option <= 4){
+			if(option == 4)
 				is_get_clist = true;
 			Request(option); // 调用Request获得时间、名字、客户端列表			
 		}
-		else if (option == 6){
+		else if (option == 5){
 			if(is_get_clist)
 				Send();
 			else
 				printf("You shoule first get the client list before sending any message!\n"); 
 		}
+		else if (option == 6)
+			Close();
 		else if (option == 7){
 			if (connectedToServer){
 				Close();							
 			}
 			break;
 		}
+
+		if(option == 1)
+			mySleep(1);
 	}
 	return 0;
 }
@@ -124,15 +128,15 @@ void alterLock(bool type) {
 	pthread_mutex_unlock(&mutex);		// 释放了对互斥变量的锁
 }
 
-
 void *receive(void *args) {
 	SOCKET *c_socket = (SOCKET *)args;
+	//int count = 0;
 	
 	// 通过循环不断接收从客户端传来的数据，并对接收到的数据进行处理
 	while (true)
 	{
 		char buffer_recv[PACKET_LENGTH];
-		int ret = recv(*c_socket,buffer_recv,PACKET_LENGTH,0);   // 通过 recv 函数接收数据
+		int ret = recv(*c_socket,buffer_recv,PACKET_LENGTH,0);   // 通过 recv 函数将server发来的packet中的数据接收，放入buffer_recv
 		if (ret == SOCKET_ERROR || ret == 0)				  // 如果出错或是接收完毕就退出 
 			break;
 			
@@ -144,11 +148,13 @@ void *receive(void *args) {
     	sprintf(buf, "%d/%02d/%02d %02d:%02d:%02d", ptm->tm_year+1900, ptm->tm_mon+1,ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec);
 		
 		// 将接收到的字符串转换为 packet 对象
+		// 先将buffer_recv赋值给string类型的pstr
         string pstr = buffer_recv;
         if(strcmp(pstr.c_str(),"\n")!=0) {
         	const char* p = pstr.data();
         	packet* pack = deserialize(p);
         	
+			cout << "\n";
         	// 输出在当前时间收到一个packet 
         	if(pack->command >= '1' && pack->command <= '4')
 				cout << "[" << buf << "]" << "Recieve a packet." << endl;
@@ -160,9 +166,10 @@ void *receive(void *args) {
 			
 			switch (pack->command) {
         		case '1': { //时间
+					//count++;
             		printf("Current server time: %s\n", pack->payload);
             		time_reply_count++;
-            		printf("time reply count: %d\n",time_reply_count);
+            		printf("time reply count: %d\n", time_reply_count);
 					alterLock(false);
            	 		break;
         		}
@@ -183,6 +190,7 @@ void *receive(void *args) {
         		}
     		}
    	 	}
+
 	}
 }
 
@@ -194,10 +202,10 @@ void Connect() {
 	}
 
 	// 从用户获得想要连接的ip地址和端口号 
-	static char ip[MAX_LENGTH];
+	static char ip[MAX_LENGTH] = "127.0.0.1";
 	int port;
-	cout << "Input IP (default: 127.0.0.1): ";
-	cin >> ip;
+	//cout << "Input IP (default: 127.0.0.1): ";
+	//cin >> ip;
 	fflush(stdin);
 
 	cout << "Input port (default: 3380): ";
@@ -209,7 +217,7 @@ void Connect() {
 	saServer.sin_family = AF_INET;
 	saServer.sin_port = htons(port); 
 	saServer.sin_addr.S_un.S_addr = inet_addr(ip);
-	printf("%s\n", ((struct sockaddr*)&saServer)->sa_data);
+	//printf("%s\n", ((struct sockaddr*)&saServer)->sa_data);
 
 	// 判断能否建立连接 
 	int ret = connect(c_socket, (struct sockaddr *)&saServer, sizeof(saServer));
@@ -234,17 +242,20 @@ void Connect() {
 	else 
 		puts("SUCCESS:\tCreate pthread Successful!");
 	
-	//连接成功，发送一个packet
-	//packet* pack = {CONFIRM_NUM, 1, 0, 0, ""}; //connect
-	//string pstr = serialize(pack); //
-	//send(c_socket, pstr.c_str(), pstr.size(), 0);
 }
 
 void Close() {
-	//关闭连接，发送一个packet
-	/*packet pack = {CONFIRM_NUM, 5, ""}; //close
-	string pstr = serialize(pack); //
-	send(c_socket, pstr.c_str(), pstr.size(), 0);*/
+
+	// 关闭连接，创建发送所需信息的packet
+	struct packet pack;
+	pack.command = '5';
+	pack.src = ClientId;
+	pack.dst = ServerId;
+	//memset(pack.payload, 0, PAYLOAD_LENGTH);
+
+	char pstr[PACKET_LENGTH];
+	memcpy(pstr, serialize(pack), PACKET_LENGTH);
+	send(c_socket, pstr, PACKET_LENGTH, 0);
 	
 	// 关闭socket并修改flag，等待子线程的结束 
 	closesocket(c_socket);
@@ -263,22 +274,42 @@ void Close() {
 }
 
 void Request(short option) {
-	// option在3-5之间
-	short type = option - 2;
-	//option == 3，type = 1;        //time:1
-	//option == 4，type = 2;        //name:2
-	//option == 5，type = 3;        //client list:3
+	// option在2-4之间
+	short type = option - 1;
+	int i;
+	
+	/*
+	for(i = 0;i < 100;i++){
+		// 创建发送所需信息的packet
+		struct packet pack;
+		pack.command = type + '0';
+		pack.src = ClientId;
+		pack.dst = ServerId;
+		memset(pack.payload, 0, PAYLOAD_LENGTH);
+
+		char pstr[PACKET_LENGTH];
+		memcpy(pstr, serialize(pack), PACKET_LENGTH);
+		send(c_socket, pstr, PACKET_LENGTH, 0);
+
+		alterLock(true);	
+		for(;;) { // 等待回复，直到收到packet
+			pthread_mutex_lock(&mutex);
+			if (!waitingStatus) {
+				pthread_mutex_unlock(&mutex);
+				break;
+			}
+			pthread_mutex_unlock(&mutex);
+			Sleep(waitTime);
+		}
+	}*/
 	
 	// 创建发送所需信息的packet
 	struct packet pack;
-	//pack.confirm_num = CONFIRM_NUM; // Set confirm_num member
 	pack.command = type + '0';
 	pack.src = ClientId;
 	pack.dst = ServerId;
 	memset(pack.payload, 0, PAYLOAD_LENGTH);
 
-	//string pstr = serialize(pack); // string类和char* 的区别？ 
-	//send(c_socket, pstr.c_str(), pstr.size(), 0);
 	char pstr[PACKET_LENGTH];
 	memcpy(pstr, serialize(pack), PACKET_LENGTH);
 	send(c_socket, pstr, PACKET_LENGTH, 0);
@@ -304,22 +335,23 @@ void Send() {
 	fflush(stdin);
 
 	// 读入message
-	puts("Input message (end with '#'):");
-	char buf[MAX_LENGTH] = {0};
-	scanf("%[^#]",buf); //end with '#'
+	puts("Input message: ");
+	char buf[PAYLOAD_LENGTH] = {0};
+	cin.getline(buf, 512);
 	fflush(stdin);
 	const char* content = buf;
 
 	// 给server发送一个packet 
 	struct packet pack;
-	//pack.confirm_num = CONFIRM_NUM; 
 	pack.command = SendMessages;
 	pack.src = ClientId;
 	pack.dst = client_id;
+	memset(pack.payload, 0, PAYLOAD_LENGTH);
 	strcpy(pack.payload, content);
 	
-	string pstr = serialize(pack);  // string类和char* 的区别？ 
-	send(c_socket, pstr.c_str(), pstr.size(), 0);
+	char pstr[PACKET_LENGTH] = {0};;
+	memcpy(pstr, serialize(pack), PACKET_LENGTH);
+	send(c_socket, pstr, PACKET_LENGTH, 0);
 	
 	alterLock(true);	
 	for(;;){ //等待回应直到receive收到一个packet 
@@ -333,10 +365,14 @@ void Send() {
 	}
 }
 
-void Exit()
-{
+void Exit() {
 	if (connectedToServer)
 		Close();
-	//is_exit = true;
 	exit(0);
+}
+
+void mySleep(int second) {
+    time_t start;
+    start = time(NULL);
+    while((time(NULL) - start) < second);
 }

@@ -11,6 +11,7 @@
 #include <map>
 #include <string>
 #include <chrono>
+#include <unistd.h>
                                              //!server相关结构体
 /*struct sockaddr_in {
      short            sin_family;            // 2 字节 ，地址族，e.g. AF_INET, AF_INET6

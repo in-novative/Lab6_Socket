@@ -31,7 +31,7 @@ struct packet {
     int src;                                                                                        //消息的源地址
     int dst;                                                                                        //消息的目标地址(服务器为0，消息转发时为目标id)
     char *payload = new char[PAYLOAD_LENGTH];                                                       //消息内容
-};                                                                                                  // 自定义的数据包格式
+};                                                                                                  //自定义的数据包格式
 
 char* serialize(struct packet message)                                                              //数据包序列化函数
 {
@@ -48,21 +48,27 @@ char* serialize(struct packet message)                                          
 
 struct packet* deserialize(const char* string_in)                                                   //数据包反序列化函数
 {
-    char *ss = new char[PACKET_LENGTH];
-    struct packet* message = new packet();                                                          //?内存泄露问题，在调用后释放内存
-    memcpy(ss, string_in, 6);
-    message->confirm_num = static_cast<uint32_t>(std::stoul(ss, nullptr, 16));
-    memset(ss, 0, PACKET_LENGTH);
-    memcpy(ss, string_in+6, 4);
-    message->command = static_cast<short>(std::stoi(ss, nullptr, 16));
-    memset(ss, 0, PACKET_LENGTH);
-    memcpy(ss, string_in+10, 4);
-    message->src = static_cast<int>(std::stoi(ss, nullptr, 16));
-    memset(ss, 0, PACKET_LENGTH);
-    memcpy(ss, string_in+14, 4);
-    message->dst = static_cast<int>(std::stoi(ss, nullptr, 16));
-    memset(message->payload, 0, PAYLOAD_LENGTH);
-    memcpy(message->payload, string_in+18, PAYLOAD_LENGTH);
-    return message;
+    try {
+        char *ss = new char[PACKET_LENGTH];
+        struct packet* message = new packet();                                                          //?内存泄露问题，在调用后释放内存
+        memcpy(ss, string_in, 6);
+        message->confirm_num = static_cast<uint32_t>(std::stoul(ss, nullptr, 16));
+        memset(ss, 0, PACKET_LENGTH);
+        memcpy(ss, string_in+6, 4);
+        message->command = static_cast<short>(std::stoi(ss, nullptr, 16));
+        memset(ss, 0, PACKET_LENGTH);
+        memcpy(ss, string_in+10, 4);
+        message->src = static_cast<int>(std::stoi(ss, nullptr, 16));
+        memset(ss, 0, PACKET_LENGTH);
+        memcpy(ss, string_in+14, 4);
+        message->dst = static_cast<int>(std::stoi(ss, nullptr, 16));
+        memset(message->payload, 0, PAYLOAD_LENGTH);
+        memcpy(message->payload, string_in+18, PAYLOAD_LENGTH);
+        delete[] ss;
+        return message;
+    } catch (const std::exception& e) {
+        //std::cerr << "Exception caught: " << e.what() << std::endl;
+        return nullptr; // or handle the error in an appropriate way
+    }
 }
 #endif
